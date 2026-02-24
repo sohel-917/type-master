@@ -283,12 +283,22 @@ export default function App() {
     <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
       {/* Header */}
       <header className="w-full max-w-4xl flex justify-between items-center mb-12">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setScreen('home')}>
-          <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
-            <Zap className="text-white w-6 h-6" />
+        <motion.div 
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="flex items-center gap-3 cursor-pointer group" 
+          onClick={() => setScreen('home')}
+        >
+          <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-xl shadow-indigo-500/30 group-hover:rotate-12 transition-transform duration-300">
+            <Zap className="text-white w-7 h-7 fill-white/20" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">TypeMaster <span className="text-indigo-600">Pro</span></h1>
-        </div>
+          <div className="flex flex-col -space-y-1">
+            <h1 className="text-2xl font-black tracking-tighter text-gray-900 dark:text-white">
+              TYPEMASTER<span className="text-indigo-600">PRO</span>
+            </h1>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Speed & Accuracy</span>
+          </div>
+        </motion.div>
         
         <div className="flex items-center gap-2">
           <button 
