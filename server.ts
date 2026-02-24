@@ -1,31 +1,19 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("typing_test.db");
-
-// Initialize database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS scores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    wpm REAL NOT NULL,
-    accuracy REAL NOT NULL,
-    difficulty TEXT NOT NULL,
-    mode TEXT NOT NULL,
-    date DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS daily_challenges (
-    date DATE PRIMARY KEY,
-    paragraph TEXT NOT NULL
-  );
-`);
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function startServer() {
   const app = express();
@@ -33,49 +21,127 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Routes
-  app.get("/api/leaderboard", (req, res) => {
-    const difficulty = req.query.difficulty;
-    let query = "SELECT * FROM scores";
-    let params: any[] = [];
-
-    if (difficulty && difficulty !== 'all') {
-      query += " WHERE difficulty = ?";
-      params.push(difficulty);
+  // Auth Routes
+  app.post("/api/auth/signup", async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
     }
 
-    query += " ORDER BY wpm DESC LIMIT 10";
-    
-    const scores = db.prepare(query).all(...params);
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{ email, password: hashedPassword }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase signup error:", error);
+        if (error.code === '23505' || error.message?.includes('unique constraint')) {
+          return res.status(400).json({ error: "Email already exists" });
+        }
+        return res.status(400).json({ error: error.message || "Failed to create user" });
+      }
+      res.json({ id: data.id, email: data.email });
+    } catch (error: any) {
+      console.error("Signup catch error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/signin", async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    res.json({ id: user.id, email: user.email });
+  });
+
+  // API Routes
+  app.get("/api/leaderboard", async (req, res) => {
+    const difficulty = req.query.difficulty;
+    let query = supabase.from('scores').select('*');
+
+    if (difficulty && difficulty !== 'all') {
+      query = query.eq('difficulty', difficulty);
+    }
+
+    const { data: scores, error } = await query
+      .order('wpm', { ascending: false })
+      .limit(10);
+
+    if (error) return res.status(500).json({ error: error.message });
     res.json(scores);
   });
 
-  app.post("/api/scores", (req, res) => {
+  app.post("/api/scores", async (req, res) => {
     const { name, wpm, accuracy, difficulty, mode } = req.body;
     if (!name || wpm === undefined || accuracy === undefined) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const stmt = db.prepare(
-      "INSERT INTO scores (name, wpm, accuracy, difficulty, mode) VALUES (?, ?, ?, ?, ?)"
-    );
-    const result = stmt.run(name, wpm, accuracy, difficulty, mode);
-    res.json({ id: result.lastInsertRowid });
+    const { data, error } = await supabase
+      .from('scores')
+      .insert([{ name, wpm, accuracy, difficulty, mode }])
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Calculate rank
+    const { count, error: rankError } = await supabase
+      .from('scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('difficulty', difficulty)
+      .gt('wpm', wpm);
+
+    if (rankError) return res.status(500).json({ error: rankError.message });
+
+    res.json({ id: data.id, rank: (count || 0) + 1 });
   });
 
-  app.get("/api/user-progress", (req, res) => {
+  app.get("/api/user-progress", async (req, res) => {
     const name = req.query.name;
     if (!name) return res.status(400).json({ error: "Name required" });
 
-    const scores = db.prepare(
-      "SELECT wpm, accuracy, date FROM scores WHERE name = ? ORDER BY date ASC"
-    ).all(name);
+    const { data: scores, error } = await supabase
+      .from('scores')
+      .select('wpm, accuracy, date')
+      .eq('name', name)
+      .order('date', { ascending: true });
+
+    if (error) return res.status(500).json({ error: error.message });
     res.json(scores);
   });
 
-  app.get("/api/daily-challenge", (req, res) => {
+  app.get("/api/daily-challenge", async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
-    let challenge = db.prepare("SELECT paragraph FROM daily_challenges WHERE date = ?").get(today) as { paragraph: string } | undefined;
+    let { data: challenge, error } = await supabase
+      .from('daily_challenges')
+      .select('paragraph')
+      .eq('date', today)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      return res.status(500).json({ error: error.message });
+    }
 
     if (!challenge) {
       const paragraphs = [
@@ -86,27 +152,49 @@ async function startServer() {
         "The only way to do great work is to love what you do. If you haven't found it yet, keep looking. Don't settle."
       ];
       const randomParagraph = paragraphs[Math.floor(Math.random() * paragraphs.length)];
-      db.prepare("INSERT INTO daily_challenges (date, paragraph) VALUES (?, ?)").run(today, randomParagraph);
-      challenge = { paragraph: randomParagraph };
+      
+      const { data: newChallenge, error: insertError } = await supabase
+        .from('daily_challenges')
+        .insert([{ date: today, paragraph: randomParagraph }])
+        .select()
+        .single();
+
+      if (insertError) return res.status(500).json({ error: insertError.message });
+      challenge = newChallenge;
     }
 
     res.json(challenge);
   });
 
   // Admin Routes
-  app.get("/api/admin/scores", (req, res) => {
-    const scores = db.prepare("SELECT * FROM scores ORDER BY date DESC").all();
+  app.get("/api/admin/scores", async (req, res) => {
+    const { data: scores, error } = await supabase
+      .from('scores')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
     res.json(scores);
   });
 
-  app.delete("/api/admin/scores/:id", (req, res) => {
+  app.delete("/api/admin/scores/:id", async (req, res) => {
     const { id } = req.params;
-    db.prepare("DELETE FROM scores WHERE id = ?").run(id);
+    const { error } = await supabase
+      .from('scores')
+      .delete()
+      .eq('id', id);
+
+    if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
   });
 
-  app.post("/api/admin/reset", (req, res) => {
-    db.prepare("DELETE FROM scores").run();
+  app.post("/api/admin/reset", async (req, res) => {
+    const { error } = await supabase
+      .from('scores')
+      .delete()
+      .neq('id', -1); // Delete all rows
+
+    if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
   });
 

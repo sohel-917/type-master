@@ -15,6 +15,8 @@ import {
   Calendar,
   User,
   Medal,
+  Lock,
+  LogOut,
   ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -32,9 +34,16 @@ import { PARAGRAPHS } from './constants';
 
 export default function App() {
   // App State
-  const [screen, setScreen] = useState<'home' | 'test' | 'leaderboard' | 'progress' | 'admin'>('home');
+  const [screen, setScreen] = useState<'home' | 'test' | 'leaderboard' | 'progress' | 'admin' | 'auth' | 'summary'>('home');
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
-  const [userName, setUserName] = useState(() => localStorage.getItem('userName') || '');
+  const [user, setUser] = useState<{ id: number, email: string } | null>(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authForm, setAuthForm] = useState({ email: '', password: '', confirmPassword: '' });
+  const [authError, setAuthError] = useState('');
+  
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [mode, setMode] = useState<Mode>('normal');
   
@@ -47,6 +56,7 @@ export default function App() {
   const [accuracy, setAccuracy] = useState(100);
   const [isFinished, setIsFinished] = useState(false);
   const [timer, setTimer] = useState(0);
+  const [lastResult, setLastResult] = useState<{ wpm: number, accuracy: number, rank: number, time: number } | null>(null);
   
   // Data State
   const [leaderboard, setLeaderboard] = useState<Score[]>([]);
@@ -66,6 +76,15 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDark]);
+
+  // Auth effect
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('user');
+    }
+  }, [user]);
 
   // Timer effect
   useEffect(() => {
@@ -102,11 +121,10 @@ export default function App() {
   }, [userInput, paragraph, startTime, endTime]);
 
   const startTest = async () => {
-    if (!userName.trim()) {
-      alert("Please enter your name first!");
+    if (!user) {
+      setScreen('auth');
       return;
     }
-    localStorage.setItem('userName', userName);
     
     let targetParagraph = '';
     if (mode === 'daily') {
@@ -137,20 +155,31 @@ export default function App() {
     setIsFinished(true);
     
     // Final calculation
-    const timeInMinutes = (now - (startTime || now)) / 60000;
+    const timeInSeconds = Math.floor((now - (startTime || now)) / 1000);
+    const timeInMinutes = timeInSeconds / 60;
     const finalWpm = Math.round((userInput.length / 5) / timeInMinutes);
     
-    await fetch('/api/scores', {
+    const res = await fetch('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: userName,
+        name: user?.email,
         wpm: finalWpm,
         accuracy,
         difficulty,
         mode
       })
     });
+    
+    const data = await res.json();
+    setLastResult({
+      wpm: finalWpm,
+      accuracy,
+      rank: data.rank,
+      time: timeInSeconds
+    });
+    
+    setTimeout(() => setScreen('summary'), 1000);
   };
 
   const fetchLeaderboard = async () => {
@@ -161,11 +190,11 @@ export default function App() {
   };
 
   const fetchUserProgress = async () => {
-    if (!userName) {
-      alert("Please enter your name to view progress!");
+    if (!user) {
+      setScreen('auth');
       return;
     }
-    const res = await fetch(`/api/user-progress?name=${userName}`);
+    const res = await fetch(`/api/user-progress?name=${user.email}`);
     const data = await res.json();
     setUserProgress(data);
     setScreen('progress');
@@ -188,6 +217,45 @@ export default function App() {
       await fetch('/api/admin/reset', { method: 'POST' });
       fetchAdminScores();
     }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+
+    if (authMode === 'signup' && authForm.password !== authForm.confirmPassword) {
+      setAuthError('Passwords do not match');
+      return;
+    }
+
+    const endpoint = authMode === 'signin' ? '/api/auth/signin' : '/api/auth/signup';
+    
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: authForm.email,
+          password: authForm.password
+        })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        setUser(data);
+        setScreen('home');
+        setAuthForm({ email: '', password: '', confirmPassword: '' });
+      } else {
+        setAuthError(data.error || 'Authentication failed');
+      }
+    } catch (err) {
+      setAuthError('Network error. Please try again.');
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setScreen('home');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,6 +308,170 @@ export default function App() {
 
       <main className="w-full max-w-4xl flex-1 flex flex-col items-center justify-center">
         <AnimatePresence mode="wait">
+          {screen === 'auth' && (
+            <motion.div 
+              key="auth"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full max-w-md space-y-8"
+            >
+              <div className="text-center space-y-2">
+                <h2 className="text-4xl font-extrabold text-gray-900 dark:text-white">
+                  {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
+                </h2>
+                <p className="text-gray-500 dark:text-gray-400">
+                  {authMode === 'signin' ? 'Sign in to track your progress' : 'Join TypeMaster Pro today'}
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 space-y-6">
+                <form onSubmit={handleAuth} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Email Address</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input 
+                        type="email" 
+                        required
+                        value={authForm.email}
+                        onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                        placeholder="Enter email"
+                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input 
+                        type="password" 
+                        required
+                        value={authForm.password}
+                        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                        placeholder="Enter password"
+                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {authMode === 'signup' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Confirm Password</label>
+                      <div className="relative">
+                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input 
+                          type="password" 
+                          required
+                          value={authForm.confirmPassword}
+                          onChange={(e) => setAuthForm({ ...authForm, confirmPassword: e.target.value })}
+                          placeholder="Confirm password"
+                          className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {authError && (
+                    <p className="text-red-500 text-sm font-medium text-center">{authError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-500/30 transition-all"
+                  >
+                    {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
+                  </button>
+                </form>
+
+                <div className="text-center">
+                  <button 
+                    onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                    className="text-indigo-600 dark:text-indigo-400 font-semibold text-sm hover:underline"
+                  >
+                    {authMode === 'signin' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setScreen('home')}
+                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                Back to Home
+              </button>
+            </motion.div>
+          )}
+
+          {screen === 'summary' && lastResult && (
+            <motion.div 
+              key="summary"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-2xl space-y-8"
+            >
+              <div className="text-center space-y-4">
+                <div className="inline-flex p-4 bg-indigo-100 dark:bg-indigo-900/40 rounded-full mb-2">
+                  <Trophy className="w-12 h-12 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white">Great Job!</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-lg">You've completed the {difficulty} test.</p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">WPM</div>
+                  <div className="text-4xl font-black text-indigo-600">{lastResult.wpm}</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Accuracy</div>
+                  <div className="text-4xl font-black text-green-500">{lastResult.accuracy}%</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Rank</div>
+                  <div className="text-4xl font-black text-amber-500">#{lastResult.rank}</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Time</div>
+                  <div className="text-4xl font-black text-indigo-600">{lastResult.time}s</div>
+                </div>
+              </div>
+
+              <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white text-center space-y-4 shadow-xl shadow-indigo-500/30">
+                <h3 className="text-xl font-bold">You are currently ranked #{lastResult.rank}</h3>
+                <p className="opacity-80">Keep practicing to climb higher on the leaderboard!</p>
+                <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center">
+                  <button 
+                    onClick={startTest}
+                    className="px-8 py-3.5 bg-white text-indigo-600 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                    Try Again
+                  </button>
+                  <button 
+                    onClick={fetchLeaderboard}
+                    className="px-8 py-3.5 bg-indigo-500 text-white rounded-2xl font-bold hover:bg-indigo-400 transition-all border border-indigo-400 flex items-center justify-center gap-2"
+                  >
+                    <Trophy className="w-5 h-5" />
+                    View Leaderboard
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setScreen('home')}
+                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                Back to Home
+              </button>
+            </motion.div>
+          )}
+
           {screen === 'home' && (
             <motion.div 
               key="home"
@@ -249,24 +481,42 @@ export default function App() {
               className="w-full max-w-md space-y-8"
             >
               <div className="text-center space-y-2">
-                <h2 className="text-4xl font-extrabold text-gray-900 dark:text-white">Ready to test your speed?</h2>
+                <h2 className="text-4xl font-extrabold text-gray-900 dark:text-white">
+                  {user ? `Welcome, ${user.email}!` : 'Ready to test your speed?'}
+                </h2>
                 <p className="text-gray-500 dark:text-gray-400">Improve your typing skills with real-time feedback.</p>
               </div>
 
               <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-700 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Your Name</label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input 
-                      type="text" 
-                      value={userName}
-                      onChange={(e) => setUserName(e.target.value)}
-                      placeholder="Enter your name..."
-                      className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                    />
+                {!user && (
+                  <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 text-center">
+                    <p className="text-indigo-600 dark:text-indigo-400 text-sm font-medium mb-2">Sign in to save your scores and track progress!</p>
+                    <button 
+                      onClick={() => setScreen('auth')}
+                      className="text-indigo-700 dark:text-indigo-300 font-bold text-sm hover:underline"
+                    >
+                      Sign In / Sign Up
+                    </button>
                   </div>
-                </div>
+                )}
+
+                {user && (
+                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-indigo-100 dark:bg-indigo-900/40 p-2 rounded-xl">
+                        <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <span className="font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{user.email}</span>
+                    </div>
+                    <button 
+                      onClick={handleLogout}
+                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Logout"
+                    >
+                      <LogOut className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Difficulty Level</label>
@@ -488,7 +738,7 @@ export default function App() {
                   <BarChart3 className="text-indigo-500 w-8 h-8" />
                   Your Progress
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400">Tracking performance for <span className="font-bold text-indigo-600">{userName}</span></p>
+                <p className="text-gray-500 dark:text-gray-400">Tracking performance for <span className="font-bold text-indigo-600">{user?.email}</span></p>
               </div>
 
               <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
