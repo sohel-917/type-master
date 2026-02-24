@@ -36,11 +36,14 @@ import { PARAGRAPHS } from './constants';
 
 export default function App() {
   // App State
-  const [screen, setScreen] = useState<'home' | 'test' | 'leaderboard' | 'progress' | 'admin' | 'auth' | 'summary'>('home');
-  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [user, setUser] = useState<{ id: number, email: string } | null>(() => {
     const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
+  });
+  const [isDark, setIsDark] = useState(true); // Default to dark mode for the new theme
+  const [screen, setScreen] = useState<'home' | 'test' | 'leaderboard' | 'progress' | 'admin' | 'auth' | 'summary'>(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? 'home' : 'auth';
   });
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authForm, setAuthForm] = useState({ email: '', password: '', confirmPassword: '' });
@@ -285,11 +288,11 @@ export default function App() {
   };
 
   const renderChar = (char: string, index: number) => {
-    let colorClass = 'text-gray-400 dark:text-gray-500';
+    let colorClass = 'text-gray-500';
     if (index < userInput.length) {
       colorClass = userInput[index] === char 
-        ? 'text-green-500 font-medium' 
-        : 'text-red-500 font-medium bg-red-100 dark:bg-red-900/30';
+        ? 'text-[#22C55E] font-medium' 
+        : 'text-[#EF4444] font-medium bg-[#EF4444]/10 rounded-sm';
     }
     const isCurrent = index === userInput.length;
     
@@ -301,39 +304,35 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
+    <div className="min-h-screen flex flex-col items-center p-4 md:p-8 bg-[#0F172A] text-[#E2E8F0]">
       {/* Header */}
       <header className="w-full max-w-4xl flex justify-between items-center mb-12">
         <motion.div 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="flex items-center gap-3 cursor-pointer group" 
-          onClick={() => setScreen('home')}
+          onClick={() => user && setScreen('home')}
         >
-          <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-xl shadow-indigo-500/30 group-hover:rotate-12 transition-transform duration-300">
-            <Zap className="text-white w-7 h-7 fill-white/20" />
+          <div className="bg-[#22D3EE] p-2.5 rounded-2xl shadow-xl shadow-[#22D3EE]/30 group-hover:rotate-12 transition-transform duration-300">
+            <Zap className="text-[#0F172A] w-7 h-7 fill-[#0F172A]/20" />
           </div>
           <div className="flex flex-col -space-y-1">
-            <h1 className="text-2xl font-black tracking-tighter text-gray-900 dark:text-white">
-              TYPEMASTER<span className="text-indigo-600">PRO</span>
+            <h1 className="text-2xl font-black tracking-tighter text-[#E2E8F0]">
+              TYPEMASTER<span className="text-[#22D3EE]">PRO</span>
             </h1>
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">Speed & Accuracy</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Speed & Accuracy</span>
           </div>
         </motion.div>
         
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setIsDark(!isDark)}
-            className="p-2.5 rounded-xl bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
-          </button>
-          <button 
-            onClick={() => screen === 'admin' ? setScreen('home') : fetchAdminScores()}
-            className="p-2.5 rounded-xl bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ShieldCheck className="w-5 h-5 text-gray-500" />
-          </button>
+          {user && (
+            <button 
+              onClick={() => screen === 'admin' ? setScreen('home') : fetchAdminScores()}
+              className="p-2.5 rounded-xl bg-[#1E293B] shadow-sm border border-gray-700 hover:bg-gray-700 transition-colors"
+            >
+              <ShieldCheck className="w-5 h-5 text-gray-400" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -348,45 +347,45 @@ export default function App() {
               className="w-full max-w-md space-y-6"
             >
               <div className="text-center space-y-2 mb-8">
-                <div className="inline-flex p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl mb-4">
-                  <Lock className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+                <div className="inline-flex p-3 bg-[#22D3EE]/10 rounded-2xl mb-4">
+                  <Lock className="w-8 h-8 text-[#22D3EE]" />
                 </div>
-                <h2 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+                <h2 className="text-4xl font-black tracking-tight text-[#E2E8F0]">
                   {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400 font-medium">
+                <p className="text-gray-400 font-medium">
                   {authMode === 'signin' ? 'Sign in to track your typing progress' : 'Join TypeMaster Pro today'}
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-2xl shadow-indigo-500/10 border border-gray-100 dark:border-gray-700 space-y-6">
+              <div className="bg-[#1E293B] p-8 rounded-[2rem] shadow-2xl shadow-[#22D3EE]/5 border border-gray-700 space-y-6">
                 {authSuccess && (
-                  <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
-                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{authSuccess}</p>
+                  <div className="p-4 bg-emerald-900/20 border border-emerald-800 rounded-2xl flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-[#22C55E] mt-0.5 shrink-0" />
+                    <p className="text-sm font-medium text-[#22C55E]">{authSuccess}</p>
                   </div>
                 )}
 
                 <form onSubmit={handleAuth} className="space-y-5">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">Email Address</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Email Address</label>
                     <div className="relative group">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#22D3EE] transition-colors" />
                       <input 
                         type="email" 
                         required
                         value={authForm.email}
                         onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
                         placeholder="you@example.com"
-                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium"
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-[#0F172A] border border-gray-700 focus:ring-2 focus:ring-[#22D3EE] focus:border-transparent outline-none transition-all font-medium text-[#E2E8F0]"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">Password</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Password</label>
                     <div className="relative group">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#22D3EE] transition-colors" />
                       <input 
                         type="password" 
                         required
@@ -394,7 +393,7 @@ export default function App() {
                         value={authForm.password}
                         onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
                         placeholder="••••••••"
-                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium"
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-[#0F172A] border border-gray-700 focus:ring-2 focus:ring-[#22D3EE] focus:border-transparent outline-none transition-all font-medium text-[#E2E8F0]"
                       />
                     </div>
                   </div>
@@ -405,9 +404,9 @@ export default function App() {
                       animate={{ opacity: 1, height: 'auto' }}
                       className="space-y-2 overflow-hidden"
                     >
-                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">Confirm Password</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Confirm Password</label>
                       <div className="relative group">
-                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-[#22D3EE] transition-colors" />
                         <input 
                           type="password" 
                           required
@@ -415,7 +414,7 @@ export default function App() {
                           value={authForm.confirmPassword}
                           onChange={(e) => setAuthForm({ ...authForm, confirmPassword: e.target.value })}
                           placeholder="••••••••"
-                          className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium"
+                          className="w-full pl-12 pr-4 py-4 rounded-2xl bg-[#0F172A] border border-gray-700 focus:ring-2 focus:ring-[#22D3EE] focus:border-transparent outline-none transition-all font-medium text-[#E2E8F0]"
                         />
                       </div>
                     </motion.div>
@@ -425,7 +424,7 @@ export default function App() {
                     <motion.div 
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-red-500 text-sm font-medium text-center"
+                      className="p-3 bg-red-900/20 border border-red-800 rounded-xl text-[#EF4444] text-sm font-medium text-center"
                     >
                       {authError}
                     </motion.div>
@@ -433,14 +432,14 @@ export default function App() {
 
                   <button
                     type="submit"
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-500/30 transition-all active:scale-[0.98]"
+                    className="w-full py-4 bg-[#22D3EE] hover:bg-[#22D3EE]/90 text-[#0F172A] rounded-2xl font-bold text-lg shadow-lg shadow-[#22D3EE]/20 transition-all active:scale-[0.98]"
                   >
                     {authMode === 'signin' ? 'Sign In' : 'Create Account'}
                   </button>
                 </form>
 
-                <div className="pt-6 border-t border-gray-100 dark:border-gray-700 text-center space-y-4">
-                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                <div className="pt-6 border-t border-gray-700 text-center space-y-4">
+                  <p className="text-gray-400 text-sm font-medium">
                     {authMode === 'signin' ? "Don't have an account? " : "Already have an account? "}
                     <button 
                       onClick={() => {
@@ -448,15 +447,15 @@ export default function App() {
                         setAuthError('');
                         setAuthSuccess('');
                       }}
-                      className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                      className="text-[#22D3EE] font-bold hover:underline"
                     >
                       {authMode === 'signin' ? "Sign Up" : "Sign In"}
                     </button>
                   </p>
 
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl text-left">
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Troubleshooting</h4>
-                    <ul className="text-[11px] text-gray-500 dark:text-gray-400 space-y-1 list-disc ml-3">
+                  <div className="p-4 bg-[#0F172A]/50 rounded-2xl text-left">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Troubleshooting</h4>
+                    <ul className="text-[11px] text-gray-400 space-y-1 list-disc ml-3">
                       <li>If you see "Rate limit exceeded", please wait 5-10 minutes.</li>
                       <li>Check your spam folder for the confirmation email.</li>
                       <li>For instant access, disable "Confirm Email" in your Supabase Auth settings.</li>
@@ -465,13 +464,15 @@ export default function App() {
                 </div>
               </div>
 
-              <button 
-                onClick={() => setScreen('home')}
-                className="w-full py-4 bg-transparent text-gray-500 dark:text-gray-400 font-bold hover:text-gray-900 dark:hover:text-white transition-colors flex items-center justify-center gap-2"
-              >
-                <ChevronLeft className="w-5 h-5" />
-                Back to Home
-              </button>
+              {user && (
+                <button 
+                  onClick={() => setScreen('home')}
+                  className="w-full py-4 bg-transparent text-gray-400 font-bold hover:text-[#E2E8F0] transition-colors flex items-center justify-center gap-2"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                  Back to Home
+                </button>
+              )}
             </motion.div>
           )}
 
@@ -484,46 +485,46 @@ export default function App() {
               className="w-full max-w-2xl space-y-8"
             >
               <div className="text-center space-y-4">
-                <div className="inline-flex p-4 bg-indigo-100 dark:bg-indigo-900/40 rounded-full mb-2">
-                  <Trophy className="w-12 h-12 text-indigo-600 dark:text-indigo-400" />
+                <div className="inline-flex p-4 bg-[#22D3EE]/10 rounded-full mb-2">
+                  <Trophy className="w-12 h-12 text-[#22D3EE]" />
                 </div>
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white">Great Job!</h2>
-                <p className="text-gray-500 dark:text-gray-400 text-lg">You've completed the {difficulty} test.</p>
+                <h2 className="text-4xl font-black text-[#E2E8F0]">Great Job!</h2>
+                <p className="text-gray-400 text-lg">You've completed the {difficulty} test.</p>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">WPM</div>
-                  <div className="text-4xl font-black text-indigo-600">{lastResult.wpm}</div>
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">WPM</div>
+                  <div className="text-4xl font-black text-[#22D3EE]">{lastResult.wpm}</div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Accuracy</div>
-                  <div className="text-4xl font-black text-green-500">{lastResult.accuracy}%</div>
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Accuracy</div>
+                  <div className="text-4xl font-black text-[#22C55E]">{lastResult.accuracy}%</div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Rank</div>
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Rank</div>
                   <div className="text-4xl font-black text-amber-500">#{lastResult.rank}</div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Time</div>
-                  <div className="text-4xl font-black text-indigo-600">{lastResult.time}s</div>
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Time</div>
+                  <div className="text-4xl font-black text-[#22D3EE]">{lastResult.time}s</div>
                 </div>
               </div>
 
-              <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white text-center space-y-4 shadow-xl shadow-indigo-500/30">
-                <h3 className="text-xl font-bold">You are currently ranked #{lastResult.rank}</h3>
-                <p className="opacity-80">Keep practicing to climb higher on the leaderboard!</p>
+              <div className="bg-[#1E293B] p-8 rounded-[2.5rem] text-[#E2E8F0] text-center space-y-4 shadow-xl border border-gray-700">
+                <h3 className="text-xl font-bold">You are currently ranked <span className="text-[#22D3EE]">#{lastResult.rank}</span></h3>
+                <p className="text-gray-400">Keep practicing to climb higher on the leaderboard!</p>
                 <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center">
                   <button 
                     onClick={startTest}
-                    className="px-8 py-3.5 bg-white text-indigo-600 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-lg"
+                    className="px-8 py-3.5 bg-[#22D3EE] text-[#0F172A] rounded-2xl font-bold hover:bg-[#22D3EE]/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#22D3EE]/20"
                   >
                     <RotateCcw className="w-5 h-5" />
                     Try Again
                   </button>
                   <button 
                     onClick={fetchLeaderboard}
-                    className="px-8 py-3.5 bg-indigo-500 text-white rounded-2xl font-bold hover:bg-indigo-400 transition-all border border-indigo-400 flex items-center justify-center gap-2"
+                    className="px-8 py-3.5 bg-[#1E293B] text-[#22D3EE] rounded-2xl font-bold hover:bg-gray-700 transition-all border border-[#22D3EE]/30 flex items-center justify-center gap-2"
                   >
                     <Trophy className="w-5 h-5" />
                     View Leaderboard
@@ -533,7 +534,7 @@ export default function App() {
 
               <button 
                 onClick={() => setScreen('home')}
-                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#1E293B] text-gray-400 rounded-2xl font-bold hover:text-[#E2E8F0] border border-gray-700 transition-all flex items-center justify-center gap-2"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Back to Home
@@ -550,36 +551,24 @@ export default function App() {
               className="w-full max-w-md space-y-8"
             >
               <div className="text-center space-y-2">
-                <h2 className="text-4xl font-extrabold text-gray-900 dark:text-white">
-                  {user ? `Welcome, ${user.email}!` : 'Ready to test your speed?'}
+                <h2 className="text-4xl font-extrabold text-[#E2E8F0]">
+                  {user ? `Welcome, ${user.email.split('@')[0]}!` : 'Ready to test your speed?'}
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400">Improve your typing skills with real-time feedback.</p>
+                <p className="text-gray-400">Improve your typing skills with real-time feedback.</p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-700 space-y-6">
-                {!user && (
-                  <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 text-center">
-                    <p className="text-indigo-600 dark:text-indigo-400 text-sm font-medium mb-2">Sign in to save your scores and track progress!</p>
-                    <button 
-                      onClick={() => setScreen('auth')}
-                      className="text-indigo-700 dark:text-indigo-300 font-bold text-sm hover:underline"
-                    >
-                      Sign In / Sign Up
-                    </button>
-                  </div>
-                )}
-
+              <div className="bg-[#1E293B] p-8 rounded-3xl shadow-xl border border-gray-700 space-y-6">
                 {user && (
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between p-4 bg-[#0F172A] rounded-2xl border border-gray-700">
                     <div className="flex items-center gap-3">
-                      <div className="bg-indigo-100 dark:bg-indigo-900/40 p-2 rounded-xl">
-                        <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <div className="bg-[#22D3EE]/10 p-2 rounded-xl">
+                        <User className="w-5 h-5 text-[#22D3EE]" />
                       </div>
-                      <span className="font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{user.email}</span>
+                      <span className="font-bold text-[#E2E8F0] truncate max-w-[200px]">{user.email}</span>
                     </div>
                     <button 
                       onClick={handleLogout}
-                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      className="p-2 text-gray-500 hover:text-[#EF4444] transition-colors"
                       title="Logout"
                     >
                       <LogOut className="w-5 h-5" />
@@ -588,7 +577,7 @@ export default function App() {
                 )}
 
                 <div className="space-y-3">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Difficulty Level</label>
+                  <label className="text-sm font-semibold text-gray-300 ml-1">Difficulty Level</label>
                   <div className="grid grid-cols-3 gap-3">
                     {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
                       <button
@@ -596,8 +585,8 @@ export default function App() {
                         onClick={() => { setDifficulty(d); setMode('normal'); }}
                         className={`py-2.5 rounded-xl text-sm font-medium capitalize transition-all ${
                           difficulty === d && mode === 'normal'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
-                            : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            ? 'bg-[#22D3EE] text-[#0F172A] shadow-lg shadow-[#22D3EE]/20'
+                            : 'bg-[#0F172A] text-gray-400 border border-gray-700 hover:bg-gray-800'
                         }`}
                       >
                         {d}
@@ -612,7 +601,7 @@ export default function App() {
                     className={`w-full py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
                       mode === 'daily'
                         ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-100'
+                        : 'bg-amber-900/20 text-amber-400 border border-amber-800 hover:bg-amber-900/30'
                     }`}
                   >
                     <Calendar className="w-4 h-4" />
@@ -622,7 +611,7 @@ export default function App() {
 
                 <button
                   onClick={startTest}
-                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 group transition-all"
+                  className="w-full py-4 bg-[#22D3EE] hover:bg-[#22D3EE]/90 text-[#0F172A] rounded-2xl font-bold text-lg shadow-lg shadow-[#22D3EE]/20 flex items-center justify-center gap-2 group transition-all"
                 >
                   Start Typing Test
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -632,16 +621,16 @@ export default function App() {
               <div className="grid grid-cols-2 gap-4">
                 <button 
                   onClick={fetchLeaderboard}
-                  className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                  className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-[#1E293B] border border-gray-700 text-gray-300 font-semibold hover:bg-gray-700 transition-all"
                 >
                   <Trophy className="w-5 h-5 text-amber-500" />
                   Leaderboard
                 </button>
                 <button 
                   onClick={fetchUserProgress}
-                  className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                  className="flex items-center justify-center gap-2 p-4 rounded-2xl bg-[#1E293B] border border-gray-700 text-gray-300 font-semibold hover:bg-gray-700 transition-all"
                 >
-                  <BarChart3 className="w-5 h-5 text-indigo-500" />
+                  <BarChart3 className="w-5 h-5 text-[#22D3EE]" />
                   My Progress
                 </button>
               </div>
@@ -657,31 +646,31 @@ export default function App() {
               className="w-full space-y-8"
             >
               <div className="grid grid-cols-3 gap-4 md:gap-8">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-2 text-gray-400 mb-1">
                     <Timer className="w-4 h-4" />
                     <span className="text-xs font-bold uppercase tracking-wider">Time</span>
                   </div>
-                  <div className="text-3xl font-black text-indigo-600">{timer}s</div>
+                  <div className="text-3xl font-black text-[#22D3EE]">{timer}s</div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-2 text-gray-400 mb-1">
                     <Zap className="w-4 h-4" />
                     <span className="text-xs font-bold uppercase tracking-wider">WPM</span>
                   </div>
-                  <div className="text-3xl font-black text-indigo-600">{wpm}</div>
+                  <div className="text-3xl font-black text-[#22D3EE]">{wpm}</div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-                  <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
+                  <div className="flex items-center justify-center gap-2 text-gray-400 mb-1">
                     <Target className="w-4 h-4" />
                     <span className="text-xs font-bold uppercase tracking-wider">Accuracy</span>
                   </div>
-                  <div className="text-3xl font-black text-indigo-600">{accuracy}%</div>
+                  <div className="text-3xl font-black text-[#22D3EE]">{accuracy}%</div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-10 rounded-[2.5rem] shadow-2xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-700 relative overflow-hidden">
-                <div className="absolute top-0 left-0 h-1.5 bg-indigo-600 transition-all duration-300" style={{ width: `${(userInput.length / paragraph.length) * 100}%` }} />
+              <div className="bg-[#1E293B] p-10 rounded-[2.5rem] shadow-2xl border border-gray-700 relative overflow-hidden">
+                <div className="absolute top-0 left-0 h-1.5 bg-[#22D3EE] transition-all duration-300" style={{ width: `${(userInput.length / paragraph.length) * 100}%` }} />
                 
                 <div className="text-2xl md:text-3xl font-mono leading-relaxed mb-8 select-none">
                   {paragraph.split('').map((char, i) => renderChar(char, i))}
@@ -697,7 +686,7 @@ export default function App() {
                     className="absolute inset-0 opacity-0 cursor-default"
                     autoFocus
                   />
-                  <div className="w-full h-16 bg-gray-50 dark:bg-gray-900 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-400 font-medium">
+                  <div className="w-full h-16 bg-[#0F172A] rounded-2xl border-2 border-dashed border-gray-700 flex items-center justify-center text-gray-500 font-medium">
                     {isFinished ? "Test Completed!" : "Start typing to begin..."}
                   </div>
                 </div>
@@ -706,14 +695,14 @@ export default function App() {
               <div className="flex justify-center gap-4">
                 <button 
                   onClick={startTest}
-                  className="flex items-center gap-2 px-8 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                  className="flex items-center gap-2 px-8 py-3.5 bg-[#1E293B] border border-gray-700 rounded-2xl font-bold text-gray-300 hover:bg-gray-700 transition-all"
                 >
                   <RotateCcw className="w-5 h-5" />
                   Restart
                 </button>
                 <button 
                   onClick={() => setScreen('home')}
-                  className="flex items-center gap-2 px-8 py-3.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-2xl font-bold hover:opacity-90 transition-all"
+                  className="flex items-center gap-2 px-8 py-3.5 bg-[#22D3EE] text-[#0F172A] rounded-2xl font-bold hover:opacity-90 transition-all"
                 >
                   <ChevronLeft className="w-5 h-5" />
                   Back to Home
@@ -735,15 +724,15 @@ export default function App() {
                   <Trophy className="text-amber-500 w-8 h-8" />
                   Leaderboard
                 </h2>
-                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                <div className="flex bg-[#1E293B] p-1 rounded-xl border border-gray-700">
                   {(['all', 'easy', 'medium', 'hard'] as const).map((d) => (
                     <button
                       key={d}
                       onClick={() => { setDifficulty(d === 'all' ? 'easy' : d); fetchLeaderboard(); }}
                       className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                         difficulty === d || (d === 'all' && difficulty === 'easy')
-                          ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                          ? 'bg-[#22D3EE] text-[#0F172A] shadow-sm'
+                          : 'text-gray-400 hover:text-[#E2E8F0]'
                       }`}
                     >
                       {d}
@@ -752,32 +741,32 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="bg-[#1E293B] rounded-3xl shadow-xl border border-gray-700 overflow-hidden">
                 {leaderboard.length > 0 ? (
-                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                  <div className="divide-y divide-gray-700">
                     {leaderboard.map((score, index) => (
-                      <div key={score.id} className="flex items-center p-5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <div key={score.id} className="flex items-center p-5 hover:bg-gray-800 transition-colors">
                         <div className="w-12 flex justify-center">
                           {index === 0 ? <Medal className="w-6 h-6 text-amber-400" /> :
                            index === 1 ? <Medal className="w-6 h-6 text-gray-400" /> :
                            index === 2 ? <Medal className="w-6 h-6 text-amber-700" /> :
-                           <span className="text-lg font-bold text-gray-300 dark:text-gray-600">#{index + 1}</span>}
+                           <span className="text-lg font-bold text-gray-600">#{index + 1}</span>}
                         </div>
                         <div className="flex-1 px-4">
-                          <div className="font-bold text-gray-900 dark:text-white">{score.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{score.difficulty} • {new Date(score.date!).toLocaleDateString()}</div>
+                          <div className="font-bold text-[#E2E8F0]">{score.name}</div>
+                          <div className="text-xs text-gray-400 capitalize">{score.difficulty} • {new Date(score.date!).toLocaleDateString()}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-xl font-black text-indigo-600">{score.wpm} <span className="text-xs font-bold text-gray-400 uppercase">WPM</span></div>
-                          <div className="text-xs font-bold text-green-500">{score.accuracy}% Acc</div>
+                          <div className="text-xl font-black text-[#22D3EE]">{score.wpm} <span className="text-xs font-bold text-gray-500 uppercase">WPM</span></div>
+                          <div className="text-xs font-bold text-[#22C55E]">{score.accuracy}% Acc</div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="p-12 text-center space-y-4">
-                    <div className="bg-gray-50 dark:bg-gray-900 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
-                      <Trophy className="w-8 h-8 text-gray-300" />
+                    <div className="bg-[#0F172A] w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+                      <Trophy className="w-8 h-8 text-gray-600" />
                     </div>
                     <p className="text-gray-500 font-medium">No scores yet. Be the first to rank!</p>
                   </div>
@@ -786,7 +775,7 @@ export default function App() {
 
               <button 
                 onClick={() => setScreen('home')}
-                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#1E293B] text-gray-300 rounded-2xl font-bold hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Back to Home
@@ -804,47 +793,47 @@ export default function App() {
             >
               <div className="text-center space-y-2">
                 <h2 className="text-3xl font-black flex items-center justify-center gap-3">
-                  <BarChart3 className="text-indigo-500 w-8 h-8" />
+                  <BarChart3 className="text-[#22D3EE] w-8 h-8" />
                   Your Progress
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400">Tracking performance for <span className="font-bold text-indigo-600">{user?.email}</span></p>
+                <p className="text-gray-400">Tracking performance for <span className="font-bold text-[#22D3EE]">{user?.email}</span></p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
+              <div className="bg-[#1E293B] p-8 rounded-[2.5rem] shadow-xl border border-gray-700">
                 <div className="h-[300px] w-full">
                   {userProgress.length > 1 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={userProgress}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#374151' : '#f3f4f6'} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" />
                         <XAxis 
                           dataKey="date" 
                           tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                          stroke={isDark ? '#9ca3af' : '#6b7280'}
+                          stroke="#9ca3af"
                           fontSize={12}
                         />
-                        <YAxis stroke={isDark ? '#9ca3af' : '#6b7280'} fontSize={12} />
+                        <YAxis stroke="#9ca3af" fontSize={12} />
                         <Tooltip 
                           contentStyle={{ 
-                            backgroundColor: isDark ? '#1f2937' : '#ffffff',
-                            borderColor: isDark ? '#374151' : '#e5e7eb',
+                            backgroundColor: '#1E293B',
+                            borderColor: '#374151',
                             borderRadius: '12px',
-                            color: isDark ? '#f9fafb' : '#111827'
+                            color: '#E2E8F0'
                           }}
                         />
                         <Line 
                           type="monotone" 
                           dataKey="wpm" 
-                          stroke="#4f46e5" 
+                          stroke="#22D3EE" 
                           strokeWidth={4} 
-                          dot={{ r: 6, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
+                          dot={{ r: 6, fill: '#22D3EE', strokeWidth: 2, stroke: '#1E293B' }}
                           activeDot={{ r: 8 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
-                      <div className="bg-gray-50 dark:bg-gray-900 w-16 h-16 rounded-full flex items-center justify-center">
-                        <BarChart3 className="w-8 h-8 text-gray-300" />
+                      <div className="bg-[#0F172A] w-16 h-16 rounded-full flex items-center justify-center">
+                        <BarChart3 className="w-8 h-8 text-gray-600" />
                       </div>
                       <p className="text-gray-500 font-medium">Complete at least 2 tests to see your trend graph.</p>
                     </div>
@@ -853,17 +842,17 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
                   <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Average WPM</div>
-                  <div className="text-3xl font-black text-indigo-600">
+                  <div className="text-3xl font-black text-[#22D3EE]">
                     {userProgress.length > 0 
                       ? Math.round(userProgress.reduce((acc, curr) => acc + curr.wpm, 0) / userProgress.length)
                       : 0}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+                <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
                   <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Best Accuracy</div>
-                  <div className="text-3xl font-black text-green-500">
+                  <div className="text-3xl font-black text-[#22C55E]">
                     {userProgress.length > 0 
                       ? Math.max(...userProgress.map(p => p.accuracy))
                       : 0}%
@@ -873,7 +862,7 @@ export default function App() {
 
               <button 
                 onClick={() => setScreen('home')}
-                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#1E293B] text-gray-300 rounded-2xl font-bold hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Back to Home
@@ -890,23 +879,23 @@ export default function App() {
               className="w-full max-w-4xl space-y-6"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-black flex items-center gap-3">
-                  <ShieldCheck className="text-indigo-600 w-8 h-8" />
+                <h2 className="text-3xl font-black flex items-center gap-3 text-[#E2E8F0]">
+                  <ShieldCheck className="text-[#22D3EE] w-8 h-8" />
                   Admin Panel
                 </h2>
                 <button 
                   onClick={resetLeaderboard}
-                  className="px-6 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl font-bold text-sm hover:bg-red-100 transition-all flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/20 rounded-xl font-bold text-sm hover:bg-[#EF4444]/20 transition-all flex items-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
                   Reset Leaderboard
                 </button>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="bg-[#1E293B] rounded-3xl shadow-xl border border-gray-700 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
+                    <thead className="bg-[#0F172A] border-b border-gray-700">
                       <tr>
                         <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
                         <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WPM</th>
@@ -916,18 +905,18 @@ export default function App() {
                         <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    <tbody className="divide-y divide-gray-700">
                       {adminScores.map((score) => (
-                        <tr key={score.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                          <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{score.name}</td>
-                          <td className="px-6 py-4 font-black text-indigo-600">{score.wpm}</td>
-                          <td className="px-6 py-4 font-bold text-green-500">{score.accuracy}%</td>
-                          <td className="px-6 py-4 capitalize text-gray-500 dark:text-gray-400">{score.difficulty}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{new Date(score.date!).toLocaleDateString()}</td>
+                        <tr key={score.id} className="hover:bg-gray-800 transition-colors">
+                          <td className="px-6 py-4 font-bold text-[#E2E8F0]">{score.name}</td>
+                          <td className="px-6 py-4 font-black text-[#22D3EE]">{score.wpm}</td>
+                          <td className="px-6 py-4 font-bold text-[#22C55E]">{score.accuracy}%</td>
+                          <td className="px-6 py-4 capitalize text-gray-400">{score.difficulty}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{new Date(score.date!).toLocaleDateString()}</td>
                           <td className="px-6 py-4">
                             <button 
                               onClick={() => deleteScore(score.id!)}
-                              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                              className="p-2 text-[#EF4444] hover:bg-[#EF4444]/10 rounded-lg transition-colors"
                             >
                               <Trash2 className="w-5 h-5" />
                             </button>
@@ -944,7 +933,7 @@ export default function App() {
 
               <button 
                 onClick={() => setScreen('home')}
-                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#1E293B] text-gray-300 rounded-2xl font-bold hover:bg-gray-700 border border-gray-700 transition-all flex items-center justify-center gap-2"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Back to Home
@@ -955,8 +944,8 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full max-w-4xl mt-12 pt-8 border-t border-gray-100 dark:border-gray-800 text-center">
-        <p className="text-gray-400 text-sm font-medium">© 2026 TypeMaster Pro • Built for Speed & Accuracy</p>
+      <footer className="w-full max-w-4xl mt-12 pt-8 border-t border-gray-800 text-center">
+        <p className="text-gray-500 text-sm font-medium">© 2026 TypeMaster Pro • Built for Speed & Accuracy</p>
       </footer>
     </div>
   );

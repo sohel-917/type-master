@@ -7,21 +7,21 @@
 }
 
 :root {
-  --bg: #f4f6f9;
-  --card: #ffffff;
-  --text: #111827;
-  --primary: #4f46e5;
-  --accent: #22c55e;
-  --error: #ef4444;
+  --bg: #0F172A;
+  --card: #1E293B;
+  --text: #E2E8F0;
+  --primary: #22D3EE;
+  --accent: #22C55E;
+  --error: #EF4444;
 }
 
 .dark {
-  --bg: #111827;
-  --card: #1f2937;
-  --text: #f9fafb;
-  --primary: #6366f1;
-  --accent: #4ade80;
-  --error: #f87171;
+  --bg: #0F172A;
+  --card: #1E293B;
+  --text: #E2E8F0;
+  --primary: #22D3EE;
+  --accent: #22C55E;
+  --error: #EF4444;
 }
 
 body {

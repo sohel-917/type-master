@@ -7,6 +7,13 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Diagnostic logging for environment variables (Safe - doesn't log the actual keys)
+console.log("--- Environment Variable Check ---");
+console.log("SUPABASE_URL present:", !!process.env.SUPABASE_URL);
+console.log("SUPABASE_ANON_KEY present:", !!process.env.SUPABASE_ANON_KEY);
+if (process.env.SUPABASE_URL) console.log("SUPABASE_URL starts with:", process.env.SUPABASE_URL.substring(0, 10) + "...");
+console.log("----------------------------------");
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
