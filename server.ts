@@ -30,13 +30,21 @@ async function startServer() {
 
     try {
       // Use Supabase built-in auth
+      // We use the origin from the request to ensure the redirect goes back to the correct preview URL
+      const origin = req.headers.origin || process.env.APP_URL || `http://localhost:3000`;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${origin}/auth/callback`,
+        }
       });
 
       if (error) {
         console.error("Supabase signup error:", error);
+        if (error.message?.includes('rate limit exceeded')) {
+          return res.status(429).json({ error: "Too many signup attempts. Please wait a few minutes and try again." });
+        }
         return res.status(400).json({ error: error.message || "Failed to create user" });
       }
       
@@ -65,6 +73,9 @@ async function startServer() {
       });
 
       if (error) {
+        if (error.message?.includes('rate limit exceeded')) {
+          return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+        }
         return res.status(401).json({ error: error.message });
       }
 
@@ -72,6 +83,11 @@ async function startServer() {
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Internal server error" });
     }
+  });
+
+  // Auth Callback for email confirmation redirects
+  app.get("/auth/callback", (req, res) => {
+    res.redirect("/");
   });
 
   // API Routes

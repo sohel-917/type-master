@@ -428,7 +428,7 @@ export default function App() {
                   </button>
                 </form>
 
-                <div className="pt-6 border-t border-gray-100 dark:border-gray-700 text-center">
+                <div className="pt-6 border-t border-gray-100 dark:border-gray-700 text-center space-y-4">
                   <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
                     {authMode === 'signin' ? "Don't have an account? " : "Already have an account? "}
                     <button 
@@ -442,6 +442,15 @@ export default function App() {
                       {authMode === 'signin' ? "Sign Up" : "Sign In"}
                     </button>
                   </p>
+
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl text-left">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Troubleshooting</h4>
+                    <ul className="text-[11px] text-gray-500 dark:text-gray-400 space-y-1 list-disc ml-3">
+                      <li>If you see "Rate limit exceeded", please wait 5-10 minutes.</li>
+                      <li>Check your spam folder for the confirmation email.</li>
+                      <li>For instant access, disable "Confirm Email" in your Supabase Auth settings.</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
 
