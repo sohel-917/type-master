@@ -29,21 +29,23 @@ async function startServer() {
     }
 
     try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const { data, error } = await supabase
-        .from('users')
-        .insert([{ email, password: hashedPassword }])
-        .select()
-        .single();
+      // Use Supabase built-in auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
       if (error) {
         console.error("Supabase signup error:", error);
-        if (error.code === '23505' || error.message?.includes('unique constraint')) {
-          return res.status(400).json({ error: "Email already exists" });
-        }
         return res.status(400).json({ error: error.message || "Failed to create user" });
       }
-      res.json({ id: data.id, email: data.email });
+      
+      // If email confirmation is required by Supabase settings, user might be null or identities empty
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        return res.status(400).json({ error: "Email already in use" });
+      }
+
+      res.json({ id: data.user?.id, email: data.user?.email, needsConfirmation: !data.session });
     } catch (error: any) {
       console.error("Signup catch error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
@@ -56,22 +58,20 @@ async function startServer() {
       return res.status(400).json({ error: "Email and password required" });
     }
 
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error || !user) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      if (error) {
+        return res.status(401).json({ error: error.message });
+      }
+
+      res.json({ id: data.user?.id, email: data.user?.email });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Internal server error" });
     }
-
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    res.json({ id: user.id, email: user.email });
   });
 
   // API Routes

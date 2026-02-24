@@ -17,7 +17,9 @@ import {
   Medal,
   Lock,
   LogOut,
-  ArrowRight
+  ArrowRight,
+  Mail,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -43,6 +45,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authForm, setAuthForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
   
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [mode, setMode] = useState<Mode>('normal');
@@ -222,6 +225,7 @@ export default function App() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
+    setAuthSuccess('');
 
     if (authMode === 'signup' && authForm.password !== authForm.confirmPassword) {
       setAuthError('Passwords do not match');
@@ -242,9 +246,15 @@ export default function App() {
       const data = await res.json();
       
       if (res.ok) {
-        setUser(data);
-        setScreen('home');
-        setAuthForm({ email: '', password: '', confirmPassword: '' });
+        if (data.needsConfirmation) {
+          setAuthSuccess('Account created! Please check your email to confirm your account before signing in.');
+          setAuthMode('signin');
+          setAuthForm({ email: '', password: '', confirmPassword: '' });
+        } else {
+          setUser(data);
+          setScreen('home');
+          setAuthForm({ email: '', password: '', confirmPassword: '' });
+        }
       } else {
         setAuthError(data.error || 'Authentication failed');
       }
@@ -321,94 +331,123 @@ export default function App() {
           {screen === 'auth' && (
             <motion.div 
               key="auth"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-md space-y-8"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md space-y-6"
             >
-              <div className="text-center space-y-2">
-                <h2 className="text-4xl font-extrabold text-gray-900 dark:text-white">
+              <div className="text-center space-y-2 mb-8">
+                <div className="inline-flex p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl mb-4">
+                  <Lock className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h2 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white">
                   {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400">
-                  {authMode === 'signin' ? 'Sign in to track your progress' : 'Join TypeMaster Pro today'}
+                <p className="text-gray-500 dark:text-gray-400 font-medium">
+                  {authMode === 'signin' ? 'Sign in to track your typing progress' : 'Join TypeMaster Pro today'}
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 space-y-6">
-                <form onSubmit={handleAuth} className="space-y-4">
+              <div className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-2xl shadow-indigo-500/10 border border-gray-100 dark:border-gray-700 space-y-6">
+                {authSuccess && (
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{authSuccess}</p>
+                  </div>
+                )}
+
+                <form onSubmit={handleAuth} className="space-y-5">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Email Address</label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">Email Address</label>
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                       <input 
                         type="email" 
                         required
                         value={authForm.email}
                         onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                        placeholder="Enter email"
-                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                        placeholder="you@example.com"
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Password</label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">Password</label>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                       <input 
                         type="password" 
                         required
+                        minLength={6}
                         value={authForm.password}
                         onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                        placeholder="Enter password"
-                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                        placeholder="••••••••"
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium"
                       />
                     </div>
                   </div>
 
                   {authMode === 'signup' && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Confirm Password</label>
-                      <div className="relative">
-                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="space-y-2 overflow-hidden"
+                    >
+                      <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">Confirm Password</label>
+                      <div className="relative group">
+                        <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                         <input 
                           type="password" 
                           required
+                          minLength={6}
                           value={authForm.confirmPassword}
                           onChange={(e) => setAuthForm({ ...authForm, confirmPassword: e.target.value })}
-                          placeholder="Confirm password"
-                          className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                          placeholder="••••••••"
+                          className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-medium"
                         />
                       </div>
-                    </div>
+                    </motion.div>
                   )}
 
                   {authError && (
-                    <p className="text-red-500 text-sm font-medium text-center">{authError}</p>
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-red-500 text-sm font-medium text-center"
+                    >
+                      {authError}
+                    </motion.div>
                   )}
 
                   <button
                     type="submit"
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-500/30 transition-all"
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-500/30 transition-all active:scale-[0.98]"
                   >
-                    {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
+                    {authMode === 'signin' ? 'Sign In' : 'Create Account'}
                   </button>
                 </form>
 
-                <div className="text-center">
-                  <button 
-                    onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                    className="text-indigo-600 dark:text-indigo-400 font-semibold text-sm hover:underline"
-                  >
-                    {authMode === 'signin' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-                  </button>
+                <div className="pt-6 border-t border-gray-100 dark:border-gray-700 text-center">
+                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                    {authMode === 'signin' ? "Don't have an account? " : "Already have an account? "}
+                    <button 
+                      onClick={() => {
+                        setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
+                        setAuthError('');
+                        setAuthSuccess('');
+                      }}
+                      className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                    >
+                      {authMode === 'signin' ? "Sign Up" : "Sign In"}
+                    </button>
+                  </p>
                 </div>
               </div>
 
               <button 
                 onClick={() => setScreen('home')}
-                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-transparent text-gray-500 dark:text-gray-400 font-bold hover:text-gray-900 dark:hover:text-white transition-colors flex items-center justify-center gap-2"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Back to Home
