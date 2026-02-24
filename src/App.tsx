@@ -269,10 +269,18 @@ export default function App() {
           setAuthForm({ email: '', password: '', confirmPassword: '' });
         }
       } else {
-        setAuthError(data.error || 'Authentication failed');
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const errorMsg = data?.error || data?.message || 'Authentication failed';
+          setAuthError(errorMsg);
+        } else {
+          const text = await res.text();
+          setAuthError(`Server error ${res.status}: ${text.substring(0, 100)}...`);
+        }
+        console.error("Auth server error:", data);
       }
     } catch (err: any) {
-      console.error("Auth error:", err);
+      console.error("Auth connection error:", err);
       setAuthError(`Connection error: ${err.message || 'Please try again'}`);
     }
   };

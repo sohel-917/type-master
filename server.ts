@@ -30,15 +30,21 @@ function getSupabase() {
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables");
+      throw new Error("SUPABASE_URL or SUPABASE_ANON_KEY is missing in environment variables.");
     }
+
+    // Warning check for the key format (don't throw, just log)
+    if (!supabaseKey.startsWith('eyJ')) {
+      console.warn("WARNING: SUPABASE_ANON_KEY does not start with 'eyJ'. This is unusual for Supabase and might cause auth failures.");
+    }
+
     supabaseClient = createClient(supabaseUrl, supabaseKey);
   }
   return supabaseClient;
 }
 
 // Auth Routes
-app.post("/api/auth/signup", async (req, res) => {
+app.post("/api/auth/signup", async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password required" });
@@ -59,13 +65,7 @@ app.post("/api/auth/signup", async (req, res) => {
       }
     });
 
-    if (error) {
-      console.error("Supabase signup error:", error);
-      if (error.message?.includes('rate limit exceeded')) {
-        return res.status(429).json({ error: "Too many signup attempts. Please wait a few minutes and try again." });
-      }
-      return res.status(400).json({ error: error.message || "Failed to create user" });
-    }
+    if (error) throw error;
     
     // If email confirmation is required by Supabase settings, user might be null or identities empty
     if (data.user && data.user.identities && data.user.identities.length === 0) {
@@ -74,12 +74,11 @@ app.post("/api/auth/signup", async (req, res) => {
 
     res.json({ id: data.user?.id, email: data.user?.email, needsConfirmation: !data.session });
   } catch (error: any) {
-    console.error("Signup catch error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    next(error);
   }
 });
 
-app.post("/api/auth/signin", async (req, res) => {
+app.post("/api/auth/signin", async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password required" });
@@ -92,16 +91,11 @@ app.post("/api/auth/signin", async (req, res) => {
       password,
     });
 
-    if (error) {
-      if (error.message?.includes('rate limit exceeded')) {
-        return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
-      }
-      return res.status(401).json({ error: error.message });
-    }
+    if (error) throw error;
 
     res.json({ id: data.user?.id, email: data.user?.email });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Internal server error" });
+    next(error);
   }
 });
 
@@ -111,151 +105,196 @@ app.get("/auth/callback", (req, res) => {
 });
 
 // API Routes
-app.get("/api/leaderboard", async (req, res) => {
-  const supabase = getSupabase();
-  const difficulty = req.query.difficulty;
-  let query = supabase.from('scores').select('*');
+app.get("/api/leaderboard", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const difficulty = req.query.difficulty;
+    let query = supabase.from('scores').select('*');
 
-  if (difficulty && difficulty !== 'all') {
-    query = query.eq('difficulty', difficulty);
+    if (difficulty && difficulty !== 'all') {
+      query = query.eq('difficulty', difficulty);
+    }
+
+    const { data: scores, error } = await query
+      .order('wpm', { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+    res.json(scores);
+  } catch (error) {
+    next(error);
   }
-
-  const { data: scores, error } = await query
-    .order('wpm', { ascending: false })
-    .limit(10);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(scores);
 });
 
-app.post("/api/scores", async (req, res) => {
-  const supabase = getSupabase();
-  const { name, wpm, accuracy, difficulty, mode } = req.body;
-  if (!name || wpm === undefined || accuracy === undefined) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
+app.post("/api/scores", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const { name, wpm, accuracy, difficulty, mode } = req.body;
+    if (!name || wpm === undefined || accuracy === undefined) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
-  const { data, error } = await supabase
-    .from('scores')
-    .insert([{ name, wpm, accuracy, difficulty, mode }])
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  // Calculate rank
-  const { count, error: rankError } = await supabase
-    .from('scores')
-    .select('*', { count: 'exact', head: true })
-    .eq('difficulty', difficulty)
-    .gt('wpm', wpm);
-
-  if (rankError) return res.status(500).json({ error: rankError.message });
-
-  res.json({ id: data.id, rank: (count || 0) + 1 });
-});
-
-app.get("/api/user-progress", async (req, res) => {
-  const supabase = getSupabase();
-  const name = req.query.name;
-  if (!name) return res.status(400).json({ error: "Name required" });
-
-  const { data: scores, error } = await supabase
-    .from('scores')
-    .select('wpm, accuracy, date')
-    .eq('name', name)
-    .order('date', { ascending: true });
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(scores);
-});
-
-app.get("/api/daily-challenge", async (req, res) => {
-  const supabase = getSupabase();
-  const today = new Date().toISOString().split('T')[0];
-  let { data: challenge, error } = await supabase
-    .from('daily_challenges')
-    .select('paragraph')
-    .eq('date', today)
-    .single();
-
-  if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-    return res.status(500).json({ error: error.message });
-  }
-
-  if (!challenge) {
-    const paragraphs = [
-      "The quick brown fox jumps over the lazy dog. This classic pangram contains every letter of the English alphabet at least once.",
-      "Success is not final, failure is not fatal: it is the courage to continue that counts. Winston Churchill once said these words to inspire a nation.",
-      "Programming is the art of telling another human what one wants the computer to do. It requires patience, logic, and a bit of creativity.",
-      "In the middle of every difficulty lies opportunity. Albert Einstein believed that challenges are just stepping stones to greatness.",
-      "The only way to do great work is to love what you do. If you haven't found it yet, keep looking. Don't settle."
-    ];
-    const randomParagraph = paragraphs[Math.floor(Math.random() * paragraphs.length)];
-    
-    const { data: newChallenge, error: insertError } = await supabase
-      .from('daily_challenges')
-      .insert([{ date: today, paragraph: randomParagraph }])
+    const { data, error } = await supabase
+      .from('scores')
+      .insert([{ name, wpm, accuracy, difficulty, mode }])
       .select()
       .single();
 
-    if (insertError) return res.status(500).json({ error: insertError.message });
-    challenge = newChallenge;
-  }
+    if (error) throw error;
 
-  res.json(challenge);
+    // Calculate rank
+    const { count, error: rankError } = await supabase
+      .from('scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('difficulty', difficulty)
+      .gt('wpm', wpm);
+
+    if (rankError) throw rankError;
+
+    res.json({ id: data.id, rank: (count || 0) + 1 });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/user-progress", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const name = req.query.name;
+    if (!name) return res.status(400).json({ error: "Name required" });
+
+    const { data: scores, error } = await supabase
+      .from('scores')
+      .select('wpm, accuracy, date')
+      .eq('name', name)
+      .order('date', { ascending: true });
+
+    if (error) throw error;
+    res.json(scores);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/daily-challenge", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const today = new Date().toISOString().split('T')[0];
+    let { data: challenge, error } = await supabase
+      .from('daily_challenges')
+      .select('paragraph')
+      .eq('date', today)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+
+    if (!challenge) {
+      const paragraphs = [
+        "The quick brown fox jumps over the lazy dog. This classic pangram contains every letter of the English alphabet at least once.",
+        "Success is not final, failure is not fatal: it is the courage to continue that counts. Winston Churchill once said these words to inspire a nation.",
+        "Programming is the art of telling another human what one wants the computer to do. It requires patience, logic, and a bit of creativity.",
+        "In the middle of every difficulty lies opportunity. Albert Einstein believed that challenges are just stepping stones to greatness.",
+        "The only way to do great work is to love what you do. If you haven't found it yet, keep looking. Don't settle."
+      ];
+      const randomParagraph = paragraphs[Math.floor(Math.random() * paragraphs.length)];
+      
+      const { data: newChallenge, error: insertError } = await supabase
+        .from('daily_challenges')
+        .insert([{ date: today, paragraph: randomParagraph }])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      challenge = newChallenge;
+    }
+
+    res.json(challenge);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Admin Routes
-app.get("/api/admin/scores", async (req, res) => {
-  const supabase = getSupabase();
-  const { data: scores, error } = await supabase
-    .from('scores')
-    .select('*')
-    .order('date', { ascending: false });
+app.get("/api/admin/scores", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const { data: scores, error } = await supabase
+      .from('scores')
+      .select('*')
+      .order('date', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(scores);
+    if (error) throw error;
+    res.json(scores);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.delete("/api/admin/scores/:id", async (req, res) => {
-  const supabase = getSupabase();
-  const { id } = req.params;
-  const { error } = await supabase
-    .from('scores')
-    .delete()
-    .eq('id', id);
+app.delete("/api/admin/scores/:id", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('scores')
+      .delete()
+      .eq('id', id);
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post("/api/admin/reset", async (req, res) => {
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from('scores')
-    .delete()
-    .neq('id', -1); // Delete all rows
+app.post("/api/admin/reset", async (req, res, next) => {
+  try {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('scores')
+      .delete()
+      .neq('id', -1); // Delete all rows
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Global Error Handler - Ensures errors are returned as JSON
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("SERVER ERROR:", err);
+  
+  // Handle Supabase specific errors
+  const errorMessage = err.message || err.error_description || "Internal server error";
+  const status = err.status || err.statusCode || 500;
+  
+  res.status(status).json({ 
+    error: errorMessage,
+    code: err.code,
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 // Vite middleware for development
 async function setupVite() {
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(__dirname, "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else if (!process.env.VERCEL) {
+      const distPath = path.join(__dirname, "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+  } catch (err) {
+    console.error("Vite setup error:", err);
   }
 }
 
