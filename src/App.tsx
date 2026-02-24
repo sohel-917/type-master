@@ -243,7 +243,17 @@ export default function App() {
           password: authForm.password
         })
       });
-      const data = await res.json();
+      
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.error("Non-JSON response:", text);
+        setAuthError(`Server error: ${res.status} ${res.statusText}`);
+        return;
+      }
       
       if (res.ok) {
         if (data.needsConfirmation) {
@@ -258,8 +268,9 @@ export default function App() {
       } else {
         setAuthError(data.error || 'Authentication failed');
       }
-    } catch (err) {
-      setAuthError('Network error. Please try again.');
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setAuthError(`Connection error: ${err.message || 'Please try again'}`);
     }
   };
 

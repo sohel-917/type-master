@@ -2,7 +2,6 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import bcrypt from "bcryptjs";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
@@ -11,9 +10,20 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Lazy initialization of Supabase
+let supabaseClient: any = null;
+function getSupabase() {
+  if (!supabaseClient) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables");
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
+}
 
 async function startServer() {
   const app = express();
@@ -29,9 +39,12 @@ async function startServer() {
     }
 
     try {
+      const supabase = getSupabase();
       // Use Supabase built-in auth
       // We use the origin from the request to ensure the redirect goes back to the correct preview URL
       const origin = req.headers.origin || process.env.APP_URL || `http://localhost:3000`;
+      console.log("Signup attempt for email:", email, "with origin:", origin);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -67,6 +80,7 @@ async function startServer() {
     }
 
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -92,6 +106,7 @@ async function startServer() {
 
   // API Routes
   app.get("/api/leaderboard", async (req, res) => {
+    const supabase = getSupabase();
     const difficulty = req.query.difficulty;
     let query = supabase.from('scores').select('*');
 
@@ -108,6 +123,7 @@ async function startServer() {
   });
 
   app.post("/api/scores", async (req, res) => {
+    const supabase = getSupabase();
     const { name, wpm, accuracy, difficulty, mode } = req.body;
     if (!name || wpm === undefined || accuracy === undefined) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -134,6 +150,7 @@ async function startServer() {
   });
 
   app.get("/api/user-progress", async (req, res) => {
+    const supabase = getSupabase();
     const name = req.query.name;
     if (!name) return res.status(400).json({ error: "Name required" });
 
@@ -148,6 +165,7 @@ async function startServer() {
   });
 
   app.get("/api/daily-challenge", async (req, res) => {
+    const supabase = getSupabase();
     const today = new Date().toISOString().split('T')[0];
     let { data: challenge, error } = await supabase
       .from('daily_challenges')
@@ -184,6 +202,7 @@ async function startServer() {
 
   // Admin Routes
   app.get("/api/admin/scores", async (req, res) => {
+    const supabase = getSupabase();
     const { data: scores, error } = await supabase
       .from('scores')
       .select('*')
@@ -194,6 +213,7 @@ async function startServer() {
   });
 
   app.delete("/api/admin/scores/:id", async (req, res) => {
+    const supabase = getSupabase();
     const { id } = req.params;
     const { error } = await supabase
       .from('scores')
@@ -205,6 +225,7 @@ async function startServer() {
   });
 
   app.post("/api/admin/reset", async (req, res) => {
+    const supabase = getSupabase();
     const { error } = await supabase
       .from('scores')
       .delete()
