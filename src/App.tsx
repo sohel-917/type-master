@@ -275,7 +275,9 @@ export default function App() {
           setAuthError(errorMsg);
         } else {
           const text = await res.text();
-          setAuthError(`Server error ${res.status}: ${text.substring(0, 100)}...`);
+          const isVercel = window.location.hostname.includes('vercel.app');
+          const debugHint = isVercel ? "\n\nHint: Visit /api/debug-env to check your Vercel Environment Variables." : "";
+          setAuthError(`Server error ${res.status}: ${text.substring(0, 100)}...${debugHint}`);
         }
         console.error("Auth server error:", data);
       }
