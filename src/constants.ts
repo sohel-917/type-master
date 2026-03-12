@@ -21,5 +21,12 @@ export const PARAGRAPHS: Record<Difficulty, string[]> = {
     "Quantum computing represents a paradigm shift in computational power, leveraging the principles of superposition and entanglement to solve problems that are currently intractable for classical computers.",
     "Sustainable development requires a holistic approach that balances economic growth, social equity, and environmental protection to ensure that future generations can meet their own needs without compromise.",
     "The intricate dance of celestial bodies in our solar system is governed by the laws of physics, which scientists have spent centuries uncovering through rigorous observation, experimentation, and mathematical modeling."
+  ],
+  expert: [
+    "The phenomenological reduction, as proposed by Edmund Husserl, involves the suspension of our natural attitude toward the world to investigate the structures of pure consciousness and the essence of intentional acts.",
+    "Asynchronous programming in distributed systems necessitates a deep understanding of eventual consistency, vector clocks, and consensus algorithms like Paxos or Raft to ensure data integrity across multiple nodes.",
+    "The thermodynamic efficiency of a heat engine is fundamentally limited by the second law of thermodynamics, which states that the total entropy of an isolated system can never decrease over time.",
+    "Cryptographic protocols such as RSA rely on the computational difficulty of factoring large integers, a problem that remains unsolved for classical computers but could be vulnerable to Shor's algorithm on a quantum machine.",
+    "The socioeconomic implications of universal basic income are multifaceted, involving complex interactions between labor market participation, wealth redistribution, and the psychological well-being of the citizenry."
   ]
 };

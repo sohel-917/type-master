@@ -19,7 +19,10 @@ import {
   LogOut,
   ArrowRight,
   Mail,
-  CheckCircle2
+  CheckCircle2,
+  MoreVertical,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -41,9 +44,14 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const [isDark, setIsDark] = useState(true); // Default to dark mode for the new theme
-  const [screen, setScreen] = useState<'home' | 'test' | 'leaderboard' | 'progress' | 'admin' | 'auth' | 'summary'>(() => {
+  const [screen, setScreen] = useState<'home' | 'test' | 'leaderboard' | 'progress' | 'admin' | 'auth' | 'summary' | 'level-selection'>(() => {
     const savedUser = localStorage.getItem('user');
-    return savedUser ? 'home' : 'auth';
+    if (savedUser) {
+      const userObj = JSON.parse(savedUser);
+      const hasSetLevel = localStorage.getItem(`hasSetLevel_${userObj.email}`);
+      return hasSetLevel ? 'home' : 'level-selection';
+    }
+    return 'auth';
   });
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authForm, setAuthForm] = useState({ email: '', password: '', confirmPassword: '' });
@@ -63,12 +71,54 @@ export default function App() {
   const [isFinished, setIsFinished] = useState(false);
   const [timer, setTimer] = useState(0);
   const [lastResult, setLastResult] = useState<{ wpm: number, accuracy: number, rank: number, time: number } | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
   
   // Data State
   const [leaderboard, setLeaderboard] = useState<Score[]>([]);
   const [userProgress, setUserProgress] = useState<UserProgress[]>([]);
   const [adminScores, setAdminScores] = useState<Score[]>([]);
   
+  // Admin Auth State
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminForm, setAdminForm] = useState({ code: '', password: '' });
+  const [adminAuthError, setAdminAuthError] = useState('');
+  
+  // Menu State
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Sound State
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const typingSound = useRef<HTMLAudioElement | null>(null);
+  const errorSound = useRef<HTMLAudioElement | null>(null);
+  const countdownSound = useRef<HTMLAudioElement | null>(null);
+  const completeSound = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    typingSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+    errorSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+    countdownSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+    completeSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3');
+    
+    // Preload
+    typingSound.current.load();
+    errorSound.current.load();
+    countdownSound.current.load();
+    completeSound.current.load();
+    
+    // Set volumes
+    typingSound.current.volume = 0.4;
+    errorSound.current.volume = 0.3;
+    countdownSound.current.volume = 0.4;
+    completeSound.current.volume = 0.5;
+  }, []);
+
+  const playSound = (sound: React.MutableRefObject<HTMLAudioElement | null>) => {
+    if (soundEnabled && sound.current) {
+      sound.current.currentTime = 0;
+      sound.current.play().catch(() => {});
+    }
+  };
+
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -150,15 +200,32 @@ export default function App() {
     setAccuracy(100);
     setTimer(0);
     setIsFinished(false);
-    setScreen('test');
     
-    setTimeout(() => inputRef.current?.focus(), 100);
+    // Start Countdown
+    setScreen('test');
+    setCountdown(3);
+    playSound(countdownSound);
+    
+    const countInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countInterval);
+          setCountdown(null);
+          setStartTime(Date.now());
+          setTimeout(() => inputRef.current?.focus(), 50);
+          return null;
+        }
+        playSound(countdownSound);
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const finishTest = async () => {
     const now = Date.now();
     setEndTime(now);
     setIsFinished(true);
+    playSound(completeSound);
     
     // Final calculation
     const timeInSeconds = Math.floor((now - (startTime || now)) / 1000);
@@ -265,7 +332,8 @@ export default function App() {
           setAuthForm({ email: '', password: '', confirmPassword: '' });
         } else {
           setUser(data);
-          setScreen('home');
+          const hasSetLevel = localStorage.getItem(`hasSetLevel_${data.email}`);
+          setScreen(hasSetLevel ? 'home' : 'level-selection');
           setAuthForm({ email: '', password: '', confirmPassword: '' });
         }
       } else {
@@ -275,9 +343,7 @@ export default function App() {
           setAuthError(errorMsg);
         } else {
           const text = await res.text();
-          const isVercel = window.location.hostname.includes('vercel.app');
-          const debugHint = isVercel ? "\n\nHint: Visit /api/debug-env to check your Vercel Environment Variables." : "";
-          setAuthError(`Server error ${res.status}: ${text.substring(0, 100)}...${debugHint}`);
+          setAuthError(`Server error ${res.status}: ${text.substring(0, 100)}...`);
         }
         console.error("Auth server error:", data);
       }
@@ -289,12 +355,38 @@ export default function App() {
 
   const handleLogout = () => {
     setUser(null);
-    setScreen('home');
+    setAuthMode('signin');
+    setScreen('auth');
+  };
+
+  const handleAdminAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminForm.code === '9177338220' && adminForm.password === 'Sohel@9177') {
+      setIsAdminAuthenticated(true);
+      setAdminAuthError('');
+      fetchAdminScores();
+    } else {
+      setAdminAuthError('Invalid admin code or password');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
     if (!startTime) setStartTime(Date.now());
-    setUserInput(e.target.value);
+    
+    // Sound logic
+    if (newValue.length > userInput.length) {
+      const lastChar = newValue[newValue.length - 1];
+      const expectedChar = paragraph[newValue.length - 1];
+      
+      if (lastChar === expectedChar) {
+        playSound(typingSound);
+      } else {
+        playSound(errorSound);
+      }
+    }
+    
+    setUserInput(newValue);
   };
 
   const renderChar = (char: string, index: number) => {
@@ -335,19 +427,111 @@ export default function App() {
         </motion.div>
         
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="p-2.5 rounded-xl bg-[#1E293B] shadow-sm border border-gray-700 hover:bg-gray-700 transition-colors"
+            title={soundEnabled ? "Disable Sound" : "Enable Sound"}
+          >
+            {soundEnabled ? <Volume2 className="w-5 h-5 text-[#22D3EE]" /> : <VolumeX className="w-5 h-5 text-gray-400" />}
+          </button>
           {user && (
-            <button 
-              onClick={() => screen === 'admin' ? setScreen('home') : fetchAdminScores()}
-              className="p-2.5 rounded-xl bg-[#1E293B] shadow-sm border border-gray-700 hover:bg-gray-700 transition-colors"
-            >
-              <ShieldCheck className="w-5 h-5 text-gray-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => screen === 'admin' ? setScreen('home') : fetchAdminScores()}
+                className="p-2.5 rounded-xl bg-[#1E293B] shadow-sm border border-gray-700 hover:bg-gray-700 transition-colors"
+                title="Admin Panel"
+              >
+                <ShieldCheck className="w-5 h-5 text-gray-400" />
+              </button>
+
+              <div className="relative">
+                <button 
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="p-2.5 rounded-xl bg-[#1E293B] shadow-sm border border-gray-700 hover:bg-gray-700 text-gray-400 hover:text-[#22D3EE] transition-colors"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+                
+                <AnimatePresence>
+                  {isMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      className="absolute right-0 mt-2 w-48 bg-[#1E293B] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden z-[100]"
+                    >
+                      <button
+                        onClick={() => {
+                          setScreen('progress');
+                          setIsMenuOpen(false);
+                          fetchUserProgress();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-[#22D3EE] transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        Profile
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-[#EF4444] hover:bg-red-900/10 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
           )}
         </div>
       </header>
 
       <main className="w-full max-w-4xl flex-1 flex flex-col items-center justify-center">
         <AnimatePresence mode="wait">
+          {screen === 'level-selection' && (
+            <motion.div 
+              key="level-selection"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-2xl space-y-8"
+            >
+              <div className="text-center space-y-4">
+                <div className="inline-flex p-4 bg-[#22D3EE]/10 rounded-full mb-2">
+                  <Target className="w-12 h-12 text-[#22D3EE]" />
+                </div>
+                <h2 className="text-4xl font-black text-[#E2E8F0]">Choose Your Level</h2>
+                <p className="text-gray-400 text-lg">We'll tailor the typing experience based on your skill.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { id: 'beginner', label: 'Beginner', difficulty: 'easy', desc: 'Just starting out. Short, simple sentences.' },
+                  { id: 'intermediate', label: 'Intermediate', difficulty: 'medium', desc: 'Comfortable typing. More complex structures.' },
+                  { id: 'advanced', label: 'Advanced', difficulty: 'hard', desc: 'Fast typist. Long, challenging paragraphs.' },
+                  { id: 'expert', label: 'Expert', difficulty: 'expert', desc: 'Master level. Technical and philosophical texts.' }
+                ].map((level) => (
+                  <button
+                    key={level.id}
+                    onClick={() => {
+                      setDifficulty(level.difficulty as Difficulty);
+                      localStorage.setItem(`hasSetLevel_${user?.email}`, 'true');
+                      setScreen('home');
+                    }}
+                    className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-left hover:border-[#22D3EE] hover:bg-gray-800 transition-all group"
+                  >
+                    <div className="text-xl font-black text-[#22D3EE] mb-2">{level.label}</div>
+                    <p className="text-sm text-gray-400 group-hover:text-gray-300">{level.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           {screen === 'auth' && (
             <motion.div 
               key="auth"
@@ -462,15 +646,6 @@ export default function App() {
                       {authMode === 'signin' ? "Sign Up" : "Sign In"}
                     </button>
                   </p>
-
-                  <div className="p-4 bg-[#0F172A]/50 rounded-2xl text-left">
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Troubleshooting</h4>
-                    <ul className="text-[11px] text-gray-400 space-y-1 list-disc ml-3">
-                      <li>If you see "Rate limit exceeded", please wait 5-10 minutes.</li>
-                      <li>Check your spam folder for the confirmation email.</li>
-                      <li>For instant access, disable "Confirm Email" in your Supabase Auth settings.</li>
-                    </ul>
-                  </div>
                 </div>
               </div>
 
@@ -568,28 +743,10 @@ export default function App() {
               </div>
 
               <div className="bg-[#1E293B] p-8 rounded-3xl shadow-xl border border-gray-700 space-y-6">
-                {user && (
-                  <div className="flex items-center justify-between p-4 bg-[#0F172A] rounded-2xl border border-gray-700">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-[#22D3EE]/10 p-2 rounded-xl">
-                        <User className="w-5 h-5 text-[#22D3EE]" />
-                      </div>
-                      <span className="font-bold text-[#E2E8F0] truncate max-w-[200px]">{user.email}</span>
-                    </div>
-                    <button 
-                      onClick={handleLogout}
-                      className="p-2 text-gray-500 hover:text-[#EF4444] transition-colors"
-                      title="Logout"
-                    >
-                      <LogOut className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
-
                 <div className="space-y-3">
                   <label className="text-sm font-semibold text-gray-300 ml-1">Difficulty Level</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
+                  <div className="grid grid-cols-4 gap-3">
+                    {(['easy', 'medium', 'hard', 'expert'] as Difficulty[]).map((d) => (
                       <button
                         key={d}
                         onClick={() => { setDifficulty(d); setMode('normal'); }}
@@ -653,8 +810,23 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full space-y-8"
+              className="w-full space-y-8 relative"
             >
+              <AnimatePresence>
+                {countdown !== null && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 2 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    className="absolute inset-0 z-50 flex items-center justify-center bg-[#0F172A]/80 backdrop-blur-sm rounded-[2.5rem]"
+                  >
+                    <div className="text-9xl font-black text-[#22D3EE] drop-shadow-[0_0_30px_rgba(34,211,238,0.5)]">
+                      {countdown}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="grid grid-cols-3 gap-4 md:gap-8">
                 <div className="bg-[#1E293B] p-6 rounded-3xl shadow-lg border border-gray-700 text-center">
                   <div className="flex items-center justify-center gap-2 text-gray-400 mb-1">
@@ -735,7 +907,7 @@ export default function App() {
                   Leaderboard
                 </h2>
                 <div className="flex bg-[#1E293B] p-1 rounded-xl border border-gray-700">
-                  {(['all', 'easy', 'medium', 'hard'] as const).map((d) => (
+                  {(['all', 'easy', 'medium', 'hard', 'expert'] as const).map((d) => (
                     <button
                       key={d}
                       onClick={() => { setDifficulty(d === 'all' ? 'easy' : d); fetchLeaderboard(); }}
@@ -886,68 +1058,140 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-4xl space-y-6"
+              className="w-full max-w-4xl space-y-6 relative"
             >
-              <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-black flex items-center gap-3 text-[#E2E8F0]">
-                  <ShieldCheck className="text-[#22D3EE] w-8 h-8" />
-                  Admin Panel
-                </h2>
-                <button 
-                  onClick={resetLeaderboard}
-                  className="px-6 py-2.5 bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/20 rounded-xl font-bold text-sm hover:bg-[#EF4444]/20 transition-all flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Reset Leaderboard
-                </button>
-              </div>
+              {!isAdminAuthenticated ? (
+                <div className="max-w-md mx-auto space-y-6">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex p-3 bg-[#22D3EE]/10 rounded-2xl mb-4">
+                      <Lock className="w-8 h-8 text-[#22D3EE]" />
+                    </div>
+                    <h2 className="text-3xl font-black text-[#E2E8F0]">Admin Access</h2>
+                    <p className="text-gray-400">Enter your credentials to access the admin panel</p>
+                  </div>
 
-              <div className="bg-[#1E293B] rounded-3xl shadow-xl border border-gray-700 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-[#0F172A] border-b border-gray-700">
-                      <tr>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WPM</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Accuracy</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Difficulty</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                      {adminScores.map((score) => (
-                        <tr key={score.id} className="hover:bg-gray-800 transition-colors">
-                          <td className="px-6 py-4 font-bold text-[#E2E8F0]">{score.name}</td>
-                          <td className="px-6 py-4 font-black text-[#22D3EE]">{score.wpm}</td>
-                          <td className="px-6 py-4 font-bold text-[#22C55E]">{score.accuracy}%</td>
-                          <td className="px-6 py-4 capitalize text-gray-400">{score.difficulty}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{new Date(score.date!).toLocaleDateString()}</td>
-                          <td className="px-6 py-4">
-                            <button 
-                              onClick={() => deleteScore(score.id!)}
-                              className="p-2 text-[#EF4444] hover:bg-[#EF4444]/10 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="bg-[#1E293B] p-8 rounded-[2rem] shadow-2xl border border-gray-700 space-y-6">
+                    <form onSubmit={handleAdminAuth} className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Admin Code</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={adminForm.code}
+                          onChange={(e) => setAdminForm({ ...adminForm, code: e.target.value })}
+                          placeholder="Enter admin code"
+                          className="w-full px-4 py-4 rounded-2xl bg-[#0F172A] border border-gray-700 focus:ring-2 focus:ring-[#22D3EE] focus:border-transparent outline-none transition-all font-medium text-[#E2E8F0]"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Password</label>
+                        <input 
+                          type="password" 
+                          required
+                          value={adminForm.password}
+                          onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                          placeholder="Enter password"
+                          className="w-full px-4 py-4 rounded-2xl bg-[#0F172A] border border-gray-700 focus:ring-2 focus:ring-[#22D3EE] focus:border-transparent outline-none transition-all font-medium text-[#E2E8F0]"
+                        />
+                      </div>
+
+                      {adminAuthError && (
+                        <div className="p-3 bg-red-900/20 border border-red-800 rounded-xl text-[#EF4444] text-sm font-medium text-center">
+                          {adminAuthError}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        className="w-full py-4 bg-[#22D3EE] hover:bg-[#22D3EE]/90 text-[#0F172A] rounded-2xl font-bold text-lg shadow-lg shadow-[#22D3EE]/20 transition-all active:scale-[0.98]"
+                      >
+                        Unlock Panel
+                      </button>
+                    </form>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setScreen('home')}
+                    className="w-full py-4 text-gray-400 font-bold hover:text-[#E2E8F0] transition-all flex items-center justify-center gap-2"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                    Back to Home
+                  </button>
                 </div>
-                {adminScores.length === 0 && (
-                  <div className="p-12 text-center text-gray-500 font-medium">No records found.</div>
-                )}
-              </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-3xl font-black flex items-center gap-3 text-[#E2E8F0]">
+                      <ShieldCheck className="text-[#22D3EE] w-8 h-8" />
+                      Admin Panel
+                    </h2>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setIsAdminAuthenticated(false)}
+                        className="px-6 py-2.5 bg-gray-700 text-gray-300 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Lock
+                      </button>
+                      <button 
+                        onClick={resetLeaderboard}
+                        className="px-6 py-2.5 bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/20 rounded-xl font-bold text-sm hover:bg-[#EF4444]/20 transition-all flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Reset Leaderboard
+                      </button>
+                    </div>
+                  </div>
 
-              <button 
-                onClick={() => setScreen('home')}
-                className="w-full py-4 bg-[#1E293B] text-gray-300 rounded-2xl font-bold hover:bg-gray-700 border border-gray-700 transition-all flex items-center justify-center gap-2"
-              >
-                <ChevronLeft className="w-5 h-5" />
-                Back to Home
-              </button>
+                  <div className="bg-[#1E293B] rounded-3xl shadow-xl border border-gray-700 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-[#0F172A] border-b border-gray-700">
+                          <tr>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">WPM</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Accuracy</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Difficulty</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                          {adminScores.map((score) => (
+                            <tr key={score.id} className="hover:bg-gray-800 transition-colors">
+                              <td className="px-6 py-4 font-bold text-[#E2E8F0]">{score.name}</td>
+                              <td className="px-6 py-4 font-black text-[#22D3EE]">{score.wpm}</td>
+                              <td className="px-6 py-4 font-bold text-[#22C55E]">{score.accuracy}%</td>
+                              <td className="px-6 py-4 capitalize text-gray-400">{score.difficulty}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{new Date(score.date!).toLocaleDateString()}</td>
+                              <td className="px-6 py-4">
+                                <button 
+                                  onClick={() => deleteScore(score.id!)}
+                                  className="p-2 text-[#EF4444] hover:bg-[#EF4444]/10 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {adminScores.length === 0 && (
+                      <div className="p-12 text-center text-gray-500 font-medium">No records found.</div>
+                    )}
+                  </div>
+
+                  <button 
+                    onClick={() => setScreen('home')}
+                    className="w-full py-4 bg-[#1E293B] text-gray-300 rounded-2xl font-bold hover:bg-gray-700 border border-gray-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                    Back to Home
+                  </button>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
